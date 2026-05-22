@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Increase base tap target comfort on touch devices */
+  input, select, textarea, button {
+    @apply touch-manipulation;
+  }
+}

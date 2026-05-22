@@ -1,0 +1,98 @@
+services:
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL — primary data store
+  # -------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: health_dashboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d health_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - healthnet
+    # Expose on localhost for direct DB access (remove in production)
+    ports:
+      - "5432:5432"
+
+  # -------------------------------------------------------------------------
+  # FastAPI — backend
+  # -------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/health_dashboard
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - healthnet
+
+  # -------------------------------------------------------------------------
+  # Clinical PWA — nurses and doctors
+  # -------------------------------------------------------------------------
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - healthnet
+
+  # -------------------------------------------------------------------------
+  # Management dashboard — district through to Minister
+  # -------------------------------------------------------------------------
+  frontend-mgmt:
+    build:
+      context: frontend-mgmt
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - healthnet
+
+networks:
+  healthnet:
+    driver: bridge
+
+volumes:
+  postgres_data:
