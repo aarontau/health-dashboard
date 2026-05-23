@@ -43,6 +43,47 @@ async def create_referral(
     return referral
 
 
+# Static routes must be declared before /referrals/{referral_id} to avoid
+# FastAPI matching "outgoing" / "incoming" as an integer referral_id.
+
+@router.get("/referrals/outgoing", response_model=list[ReferralRead])
+async def list_outgoing_referrals(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(require_min_role(UserRole.nurse)),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.facility_id:
+        return []
+    stmt = (
+        select(Referral)
+        .where(Referral.referring_facility_id == current_user.facility_id)
+        .order_by(Referral.referred_at.desc())
+        .offset(skip)
+        .limit(min(limit, 200))
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.get("/referrals/incoming", response_model=list[ReferralRead])
+async def list_incoming_referrals(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(_manager),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = (
+        select(Referral)
+        .where(Referral.receiving_facility_id == current_user.facility_id)
+        .order_by(Referral.referred_at.desc())
+        .offset(skip)
+        .limit(min(limit, 200))
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
 @router.get("/referrals/{referral_id}", response_model=ReferralRead)
 async def get_referral(
     referral_id: int,
@@ -93,41 +134,3 @@ async def update_referral_status(
     await db.commit()
     await db.refresh(referral)
     return referral
-
-
-@router.get("/referrals/outgoing", response_model=list[ReferralRead])
-async def list_outgoing_referrals(
-    skip: int = 0,
-    limit: int = 50,
-    current_user: User = Depends(require_min_role(UserRole.nurse)),
-    db: AsyncSession = Depends(get_db),
-):
-    if not current_user.facility_id:
-        return []
-    stmt = (
-        select(Referral)
-        .where(Referral.referring_facility_id == current_user.facility_id)
-        .order_by(Referral.referred_at.desc())
-        .offset(skip)
-        .limit(min(limit, 200))
-    )
-    result = await db.execute(stmt)
-    return result.scalars().all()
-
-
-@router.get("/referrals/incoming", response_model=list[ReferralRead])
-async def list_incoming_referrals(
-    skip: int = 0,
-    limit: int = 50,
-    current_user: User = Depends(_manager),
-    db: AsyncSession = Depends(get_db),
-):
-    stmt = (
-        select(Referral)
-        .where(Referral.receiving_facility_id == current_user.facility_id)
-        .order_by(Referral.referred_at.desc())
-        .offset(skip)
-        .limit(min(limit, 200))
-    )
-    result = await db.execute(stmt)
-    return result.scalars().all()

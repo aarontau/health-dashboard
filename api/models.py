@@ -7,7 +7,7 @@ from sqlalchemy import (
     BigInteger, Boolean, CHAR, Date, Enum as SAEnum, ForeignKey,
     Integer, Numeric, SmallInteger, String, Text, TIMESTAMP,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -282,6 +282,6 @@ class AuditLog(Base):
     table_name: Mapped[str] = mapped_column(String(100), nullable=False)
     record_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     payload: Mapped[Optional[dict]] = mapped_column(JSONB)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
+    ip_address: Mapped[Optional[str]] = mapped_column(INET)
     user_agent: Mapped[Optional[str]] = mapped_column(Text)
     occurred_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
