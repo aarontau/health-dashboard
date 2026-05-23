@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import engine
-from .routers import auth, consultations, dashboard, patients, referrals, users
+from .routers import auth, consultations, dashboard, facilities, patients, referrals, users
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(consultations.router)
 app.include_router(referrals.router)
+app.include_router(facilities.router)
 app.include_router(dashboard.router)
 app.include_router(users.router)
 

@@ -61,6 +61,7 @@ export default function Layout({ children }: Props) {
       <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-30">
         <div className="max-w-2xl mx-auto flex justify-around py-2">
           {navLink('/dashboard', 'Today', '📋')}
+          {navLink('/referrals', 'Referrals', '🔀')}
           {navLink('/consultation/new', 'New', '➕')}
         </div>
       </nav>

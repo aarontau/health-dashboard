@@ -66,6 +66,19 @@ class UserUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Facilities
+# ---------------------------------------------------------------------------
+
+class FacilityRead(BaseModel):
+    id: int
+    name: str
+    facility_type: FacilityType
+    facility_number: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # Patients
 # ---------------------------------------------------------------------------
 
@@ -150,6 +163,26 @@ class PrescriptionRead(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Referrals (read — defined here so ConsultationRead can reference it)
+# ---------------------------------------------------------------------------
+
+class ReferralRead(BaseModel):
+    id: int
+    consultation_id: int
+    referring_facility_id: int
+    receiving_facility_id: int
+    priority: ReferralPriority
+    reason: str
+    clinical_summary: Optional[str] = None
+    status: ReferralStatus
+    referred_at: datetime
+    accepted_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # Consultations
 # ---------------------------------------------------------------------------
 
@@ -205,12 +238,13 @@ class ConsultationRead(BaseModel):
     created_at: datetime
     diagnoses: List[DiagnosisRead] = []
     prescriptions: List[PrescriptionRead] = []
+    referrals: List[ReferralRead] = []
 
     model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------
-# Referrals
+# Referrals (write)
 # ---------------------------------------------------------------------------
 
 class ReferralCreate(BaseModel):
@@ -222,19 +256,3 @@ class ReferralCreate(BaseModel):
 
 class ReferralStatusUpdate(BaseModel):
     status: ReferralStatus
-
-
-class ReferralRead(BaseModel):
-    id: int
-    consultation_id: int
-    referring_facility_id: int
-    receiving_facility_id: int
-    priority: ReferralPriority
-    reason: str
-    clinical_summary: Optional[str] = None
-    status: ReferralStatus
-    referred_at: datetime
-    accepted_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-
-    model_config = {"from_attributes": True}

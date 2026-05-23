@@ -2,7 +2,20 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { fetchConsultation } from '../api/consultations'
-import type { ConsultationOutcome } from '../types'
+import type { ConsultationOutcome, ReferralPriority, ReferralStatus } from '../types'
+
+const PRIORITY_STYLE: Record<ReferralPriority, { label: string; cls: string }> = {
+  routine:   { label: 'Routine',   cls: 'bg-blue-100 text-blue-800'    },
+  urgent:    { label: 'Urgent',    cls: 'bg-orange-100 text-orange-800' },
+  emergency: { label: 'Emergency', cls: 'bg-red-100 text-red-800'      },
+}
+
+const REF_STATUS_STYLE: Record<ReferralStatus, { label: string; cls: string }> = {
+  pending:   { label: 'Pending',   cls: 'bg-yellow-100 text-yellow-800' },
+  accepted:  { label: 'Accepted',  cls: 'bg-green-100 text-green-800'   },
+  rejected:  { label: 'Rejected',  cls: 'bg-red-100 text-red-800'       },
+  completed: { label: 'Completed', cls: 'bg-gray-100 text-gray-600'     },
+}
 
 const OUTCOME_STYLE: Record<ConsultationOutcome, { label: string; cls: string }> = {
   treated_and_discharged:  { label: 'Discharged',  cls: 'bg-green-100 text-green-800'   },
@@ -128,6 +141,31 @@ export default function ConsultationDetailPage() {
               </li>
             ))}
           </ul>
+        </SectionCard>
+      )}
+
+      {/* Referrals */}
+      {data.referrals.length > 0 && (
+        <SectionCard title="Referral">
+          {data.referrals.map(ref => (
+            <div key={ref.id} className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${PRIORITY_STYLE[ref.priority].cls}`}>
+                  {PRIORITY_STYLE[ref.priority].label}
+                </span>
+                <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${REF_STATUS_STYLE[ref.status].cls}`}>
+                  {REF_STATUS_STYLE[ref.status].label}
+                </span>
+              </div>
+              <p className="text-sm text-gray-900">{ref.reason}</p>
+              {ref.clinical_summary && (
+                <p className="text-sm text-gray-600 italic">{ref.clinical_summary}</p>
+              )}
+              <p className="text-xs text-gray-400">
+                To facility #{ref.receiving_facility_id} · {format(new Date(ref.referred_at), 'd MMM yyyy, HH:mm')}
+              </p>
+            </div>
+          ))}
         </SectionCard>
       )}
 

@@ -26,6 +26,7 @@ def _load_full(stmt):
     return stmt.options(
         selectinload(Consultation.diagnoses),
         selectinload(Consultation.prescriptions),
+        selectinload(Consultation.referrals),
     )
 
 

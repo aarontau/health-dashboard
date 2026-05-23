@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import NewConsultationPage from './pages/NewConsultationPage'
 import ConsultationDetailPage from './pages/ConsultationDetailPage'
+import ReferralsPage from './pages/ReferralsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
                 <Layout><ConsultationDetailPage /></Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/referrals"
+            element={
+              <ProtectedRoute allowedRoles={[...CLINICAL_ROLES]}>
+                <Layout><ReferralsPage /></Layout>
               </ProtectedRoute>
             }
           />

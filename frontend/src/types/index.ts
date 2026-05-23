@@ -58,6 +58,34 @@ export interface Prescription {
   created_at: string
 }
 
+export interface Referral {
+  id: number
+  consultation_id: number
+  referring_facility_id: number
+  receiving_facility_id: number
+  priority: ReferralPriority
+  reason: string
+  clinical_summary: string | null
+  status: ReferralStatus
+  referred_at: string
+  accepted_at: string | null
+  completed_at: string | null
+}
+
+export interface ReferralCreate {
+  receiving_facility_id: number
+  priority: ReferralPriority
+  reason: string
+  clinical_summary?: string
+}
+
+export interface Facility {
+  id: number
+  name: string
+  facility_type: string
+  facility_number: string | null
+}
+
 export interface Consultation {
   id: number
   facility_id: number
@@ -80,6 +108,7 @@ export interface Consultation {
   created_at: string
   diagnoses: Diagnosis[]
   prescriptions: Prescription[]
+  referrals: Referral[]
 }
 
 export interface PatientCreate {

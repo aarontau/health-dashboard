@@ -95,6 +95,26 @@ async def update_referral_status(
     return referral
 
 
+@router.get("/referrals/outgoing", response_model=list[ReferralRead])
+async def list_outgoing_referrals(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(require_min_role(UserRole.nurse)),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.facility_id:
+        return []
+    stmt = (
+        select(Referral)
+        .where(Referral.referring_facility_id == current_user.facility_id)
+        .order_by(Referral.referred_at.desc())
+        .offset(skip)
+        .limit(min(limit, 200))
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
 @router.get("/referrals/incoming", response_model=list[ReferralRead])
 async def list_incoming_referrals(
     skip: int = 0,

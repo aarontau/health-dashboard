@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { createOrFindPatient } from '../api/patients'
 import { createConsultation } from '../api/consultations'
+import { createReferral } from '../api/referrals'
+import { searchFacilities } from '../api/facilities'
 import { searchICD10 } from '../data/icd10Common'
 import type {
-  ConsultationOutcome, DiagnosisCreate, PrescriptionCreate, Sex,
+  ConsultationOutcome, DiagnosisCreate, Facility, PrescriptionCreate, ReferralPriority, Sex,
 } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -82,6 +84,20 @@ export default function NewConsultationPage() {
   const [rxFreq, setRxFreq] = useState('')
   const [rxDays, setRxDays] = useState('')
 
+  // Referral state
+  const [facilityQuery, setFacilityQuery] = useState('')
+  const [referralFacility, setReferralFacility] = useState<Facility | null>(null)
+  const [referralPriority, setReferralPriority] = useState<ReferralPriority>('routine')
+  const [referralReason, setReferralReason] = useState('')
+  const [referralSummary, setReferralSummary] = useState('')
+
+  const { data: facilitiesData = [] } = useQuery({
+    queryKey: ['facilities', facilityQuery],
+    queryFn: () => searchFacilities(facilityQuery),
+    enabled: facilityQuery.length >= 2 && !referralFacility,
+    staleTime: 60_000,
+  })
+
   // Vitals collapse
   const [vitalsOpen, setVitalsOpen] = useState(false)
 
@@ -153,31 +169,47 @@ export default function NewConsultationPage() {
   // ---------------------------------------------------------------------------
 
   const mutation = useMutation({
-    mutationFn: createConsultation,
+    mutationFn: async (values: FormValues) => {
+      const consultation = await createConsultation({
+        patient_id: patientId!,
+        is_new_patient: isNewPatient,
+        chief_complaint: values.chief_complaint,
+        clinical_notes: values.clinical_notes || undefined,
+        outcome: values.outcome,
+        follow_up_date: values.follow_up_date || undefined,
+        systolic_bp:         values.systolic_bp         ? Number(values.systolic_bp)         : undefined,
+        diastolic_bp:        values.diastolic_bp        ? Number(values.diastolic_bp)        : undefined,
+        heart_rate:          values.heart_rate          ? Number(values.heart_rate)          : undefined,
+        temperature_celsius: values.temperature_celsius ? Number(values.temperature_celsius) : undefined,
+        oxygen_saturation:   values.oxygen_saturation   ? Number(values.oxygen_saturation)   : undefined,
+        weight_kg:           values.weight_kg           ? Number(values.weight_kg)           : undefined,
+        diagnoses: selectedDx,
+        prescriptions: rxList,
+      })
+      if (values.outcome === 'referred' && referralFacility && referralReason.trim()) {
+        try {
+          await createReferral(consultation.id, {
+            receiving_facility_id: referralFacility.id,
+            priority: referralPriority,
+            reason: referralReason.trim(),
+            clinical_summary: referralSummary.trim() || undefined,
+          })
+        } catch {
+          // Consultation saved; referral failed silently
+        }
+      }
+      return consultation
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['consultations'] })
+      queryClient.invalidateQueries({ queryKey: ['referrals'] })
       navigate(`/consultation/${data.id}`)
     },
   })
 
   function onSubmit(values: FormValues) {
     if (!patientId) return
-    mutation.mutate({
-      patient_id: patientId,
-      is_new_patient: isNewPatient,
-      chief_complaint: values.chief_complaint,
-      clinical_notes: values.clinical_notes || undefined,
-      outcome: values.outcome,
-      follow_up_date: values.follow_up_date || undefined,
-      systolic_bp:         values.systolic_bp         ? Number(values.systolic_bp)         : undefined,
-      diastolic_bp:        values.diastolic_bp        ? Number(values.diastolic_bp)        : undefined,
-      heart_rate:          values.heart_rate          ? Number(values.heart_rate)          : undefined,
-      temperature_celsius: values.temperature_celsius ? Number(values.temperature_celsius) : undefined,
-      oxygen_saturation:   values.oxygen_saturation   ? Number(values.oxygen_saturation)   : undefined,
-      weight_kg:           values.weight_kg           ? Number(values.weight_kg)           : undefined,
-      diagnoses: selectedDx,
-      prescriptions: rxList,
-    })
+    mutation.mutate(values)
   }
 
   // ---------------------------------------------------------------------------
@@ -300,6 +332,95 @@ export default function NewConsultationPage() {
               </div>
             )}
           </div>
+
+          {/* Referral details */}
+          {outcome === 'referred' && (
+            <div className="bg-white rounded-xl border border-blue-200 p-5 space-y-4">
+              <h3 className="font-semibold text-gray-800">Referral details</h3>
+
+              {/* Facility search */}
+              <div className="relative">
+                <label className={LABEL}>Receiving facility</label>
+                <input
+                  type="text"
+                  value={facilityQuery}
+                  onChange={e => { setFacilityQuery(e.target.value); setReferralFacility(null) }}
+                  className={INPUT}
+                  placeholder="Search by facility name…"
+                />
+                {facilitiesData.length > 0 && !referralFacility && (
+                  <ul className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                    {facilitiesData.map(f => (
+                      <li key={f.id}>
+                        <button
+                          type="button"
+                          onClick={() => { setReferralFacility(f); setFacilityQuery(f.name) }}
+                          className="w-full text-left px-4 py-3 hover:bg-brand-50 transition-colors"
+                        >
+                          <p className="text-sm font-medium text-gray-900">{f.name}</p>
+                          <p className="text-xs text-gray-400">{f.facility_type.replace(/_/g, ' ')}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {referralFacility && (
+                  <p className="mt-1 text-xs text-green-600">✓ {referralFacility.name}</p>
+                )}
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className={LABEL}>Priority</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['routine', 'urgent', 'emergency'] as ReferralPriority[]).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setReferralPriority(p)}
+                      className={`border-2 rounded-lg py-2.5 text-sm font-medium capitalize transition-all ${
+                        referralPriority === p
+                          ? p === 'emergency'
+                            ? 'bg-red-100 border-red-400 text-red-800'
+                            : p === 'urgent'
+                            ? 'bg-orange-100 border-orange-400 text-orange-800'
+                            : 'bg-blue-100 border-blue-400 text-blue-800'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className={LABEL}>Reason for referral</label>
+                <textarea
+                  value={referralReason}
+                  onChange={e => setReferralReason(e.target.value)}
+                  rows={2}
+                  className={INPUT}
+                  placeholder="Why is the patient being referred?"
+                />
+              </div>
+
+              {/* Clinical summary */}
+              <div>
+                <label className={LABEL}>
+                  Clinical summary <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={referralSummary}
+                  onChange={e => setReferralSummary(e.target.value)}
+                  rows={2}
+                  className={INPUT}
+                  placeholder="Relevant history and findings for the receiving clinician…"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Vitals — collapsible */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
